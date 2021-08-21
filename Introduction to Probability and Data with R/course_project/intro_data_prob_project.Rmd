@@ -1,0 +1,278 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+Loading data from local copy of .Rdata file. 
+
+```{r load-data}
+load("brfss2013.RData")
+dim(brfss2013)
+```
+
+Briefly check the dimension of the dataset, nearly 500,000 observations and 330 variables cuuld be seen. 
+
+* * *
+
+## Part 1: Data
+### Background
+
+The Behavioral Risk Factor Surveillance System (BRFSS) is supported by Disease Control and Prevention (CDC) in the United States (US). BRFSS is designed to measure behavioral health risk factors for US adult residents. It was firstly established in 1984, begin with 15 states and now including data from 50 states, also the District of Columbia, Guam, the Commonwealth of Puerto Rico. Now it is the largest health survey system around the world. 
+
+### Method of data collecting
+
+BRFSS performs both landline telephone and cellular telephone-based surveys since 2011. In landline telephone survey, interviewers collect data from a random adult in a family while in cellular telephone survey they collect data from an random adult who uses cellphone and lives in the private residence or college housing. 
+
+### Generalizability/Causality
+
+As for the generalizability, BRFSS includes all states and other territories in US. Over 400,000 interviews are finished per year.  Thus, BRFSS tends to collect enough random samples and ensure the generalizability. 
+
+Causation couldn't be indicated in BRFSS since BRFSS is observational and no random assignments to treatments was performed. Instead, correlation could be found among data. 
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+
+>Is the frequency Of using smokeless tobacco products related to the respondent's opinion of their General health status? Is there any difference between gender? 
+
+
+This is an interesting question because it can use real collected data to reveal the correlation between using smokeless tobacco products and people's assessment of their mental health. Smokeless tobacco product is invented to reduce the negative effect of real smoking, but to what extent does it still have effect on human health?
+
+It is also interesting to explore the differences between genders, which can reveal the psychological differences in perception of smokeless tobacco products among genders. 
+
+This analysis is performed with following variables:
+
+* genhlth - Corresponds to General Health
+
+* usenow3: Use Of Smokeless Tobacco Products
+
+* sex - Reported gender
+
+**Research quesion 2:**
+
+>How does depressive disorder affect the amount of sleep time? How do any difference appear between gender in depressive group? 
+
+Depression is a mental illness that plagues many people. It is very interesting to explore the sleep conditions among the depression disorders and normal people, which might provide an actual evidence about symptoms of depression. 
+
+It is necessary to explore the differences between different genders, which can reflect the response of male and female to depression and evaluate the effect. 
+
+This analysis is performed with following variables:
+
+* sleptim1 - Reported time slept per night
+
+* addepev2 - Ever Told You Had A Depressive Disorder
+
+* sex - Reported gender
+
+
+**Research quesion 3:**
+
+>Is the length of time since last routine health checkup affected by education level? What is the difference between residents from various states? 
+
+This question aims to explore the impact of different education levels on the frequency of regular physical examinations. The point of interest in this question is whether the level of education can affect people's attention to their own health. Also, explore whether there are regional differences among residents of different states.
+
+This analysis is performed with following variables:
+
+* checkup1 - Length Of Time Since Last Routine Checkup
+
+* educa - Education Level
+
+* X_state - State of residency for respondent
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+
+**Research quesion 1:**
+
+Is the frequency Of using smokeless tobacco products related to the respondent's opinion of their General health status? Is there any difference between gender? 
+
+```{r}
+# select variable and remove NA value
+q1 <- select(brfss2013, genhlth, usenow3, sex) %>% na.omit()
+dim(q1)
+
+prop.table(table(q1$genhlth,q1$usenow3),2)
+```
+
+After take a look at the proportion of health status and the frequency of using smokeless tobacco product, a stacked bar plot could be created. 
+
+```{r}
+# visualization
+g <- ggplot(q1) + aes(x=usenow3, fill=genhlth) + 
+  geom_bar(position = "fill") +
+  xlab("Frequency of using smokeless tobacco products") + 
+  ylab("Propotion") + 
+  scale_fill_discrete(name="Reported Health")
+g
+```
+
+* A trend of increasing in health status judgement could be observed from using smokeless tobacco products every day to never. 
+
+* The difference between using smokeless tobacco product every day and some days is more obviously than using such product some days and never. 
+
+Next figure illustrates the effect of gender. 
+
+```{r}
+g <- ggplot(q1) + 
+  aes(x=sex, fill=genhlth) + 
+  geom_bar(position = "fill") + 
+  facet_grid(cols=vars(usenow3)) + 
+  xlab("Smokeless tobacco product useage per Gender") + 
+  ylab("Propotion") + 
+  scale_fill_discrete(name="Reported Health")
+g
+```
+
+* Female report higher proportion of poor health status than male in every smokeless tobacco product usage groups. This might reveal that female are more sensitive about their own health status than male. 
+
+* As for male, the health status difference between smokeless tobacco product usage group is not obvious. Slightly increase of poor health status is reported in using smokeless tobacco product everyday group, but the change of health status almost disappears in 'some day' group and 'not at all' group. 
+
+In a conclusion, higher frequency of using smokeless tobacco products is related with lower evaluation of health status in both male and female group. It is worth noticed that female's evaluation of their own health status changes more obviously than male.
+
+
+
+**Research quesion 2:**
+
+How does depressive disorder affect the amount of sleep time? How do any difference appear between gender in depressive group?
+
+
+```{r}
+# select variable
+q2 <- select(brfss2013, sleptim1, addepev2, sex)
+
+table(q2$sleptim1)
+# need to remove unreasonable sleep length time.
+# set the threshold into 12 hrs
+```
+```{r}
+# filter q2 dataset and get final subdatasets for analysis
+q2_normal <- select(q2, sleptim1, addepev2, sex) %>% na.omit() %>% filter(sleptim1 <= 12 & addepev2 %in% c("No"))
+
+dim(q2_normal)
+```
+
+```{r}
+q2_dep <- select(q2, sleptim1, addepev2, sex) %>% na.omit() %>% filter(sleptim1 <= 12 & addepev2 %in% c("Yes"))
+
+dim(q2_dep)
+```
+
+New we created 2 subsets for further analysis.
+
+* `q2_normal` stores the sleep length of normal people.
+
+* `q2_dep1` stores the sleep length of depressive disorder people.
+
+
+```{r}
+normal <- summarize(q2_normal, 
+          avg=mean(sleptim1), sd=sd(sleptim1))
+dep <- summarize(q2_dep, 
+          avg=mean(sleptim1), sd=sd(sleptim1))
+summarize <- rbind(normal,dep)
+rownames(summarize) <- c("Normal", "Depressive")
+summarize
+```
+
+```{r}
+q2_all <- data.frame(cond = factor(c(rep("normal", nrow(q2_normal)),
+                                   rep("depressive",nrow(q2_dep)))),
+                     data = c(q2_normal$sleptim1, q2_dep$sleptim1))
+
+ggplot(q2_all, aes(x=data, fill=cond)) + 
+  geom_histogram(aes(y=..density..), binwidth=1, alpha=.5, position="identity") +
+  xlab("Sleep time per day(hrs)")
+
+```
+
+* Depressive people tend to have lower average sleep length per day than normal people. 
+
+* The density figure shows that in normal people group, the peak of sleep time per day is around 7.5 hrs, however, as for the depressive people, the density distribution curve shows a flat tendency from 5 to 7.5 hrs.  
+
+Then have a look at gender differences in depressive disorder group.
+
+```{r}
+filter(q2_dep) %>% group_by(sex) %>% summarize(avg=mean(sleptim1),sd=sd(sleptim1))
+```
+
+* Female depressive group has larger average sleep length than male. 
+
+In a conclusion, there is difference between depressive people and normal people of sleep length. Depressive people have shorter sleep length than normal people and female is slightly less effected than male. 
+
+
+
+**Research quesion 3:**
+
+Is the length of time since last routine health checkup affected by education level? What is the difference between residents from various states?
+
+```{r}
+# select variables
+q3 <- select(brfss2013, checkup1, educa, X_state) %>% na.omit()
+dim(q3)
+
+```
+
+```{r}
+g <- ggplot(q3)+aes(x=checkup1,fill=educa) + 
+  geom_bar(position = "fill") + 
+  xlab("Time of Last Checkup") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  ylab("Proportion") + 
+  scale_fill_discrete(name="Education level")
+g
+```
+
+* From never to within past 2 years, the proportion of people who had higher educations increases gradually.
+
+* The proportion of people who had higher educations slightly decreased between last checkup within past year and past 2 years. 
+
+
+```{r}
+# select several states we are interested in
+states <- c("Alaska","California","New York","Texas")
+
+q3_states <- filter(q3,X_state %in% states)
+dim(q3_states)
+```
+
+```{r}
+g <- ggplot(q3_states) + 
+  aes(x=checkup1,fill=educa) + 
+  geom_bar(position = "fill") + 
+  facet_grid(cols=vars(X_state)) + 
+  xlab("Time of Last Checkup") + 
+  ylab("Propotion") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  scale_fill_discrete(name="Education level")
+g
+```
+
+* Among all states we choose, the proportion of people who had college educations increases gradually from never to within past 2 years. But slightly decreased or steady could be observed between last checkup within past year and past 2 years. 
+
+* The education proportion has difference between states, but such difference doesn't effect the tendency between education and health checkup frequency. 
+
+In a conclusion, higher education has relation with higher frequency of health checkup in general. Although the education proportion is different between states, but the relation with health checkup frequency keeps the same. People who have higher education experience tend to take health checkup more often. 
+
+
+
+
+
