@@ -1,0 +1,284 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(dplyr)
+library(statsr)
+library(janitor)
+library(varhandle)
+library(RColorBrewer)
+library(ggplot2)
+
+```
+
+### Load data
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The General Social Survey (GSS) which started from 1972 aims to collect data of American society in order to observe and study the change. In this project, an extract of GSS which spanning forty years (1972-2012) are used. 
+
+### Generalization and causality
+
+Data were collected by random sampling. During the process, one adult is randomly selected from each sample family. Different sampling techniques are used such as full probability random sampling and block quota sampling. 
+
+GSS is an observational study and no treatment or control groups are included. Thus, random assignment is not used and the data collected can not establish any causal relations. 
+
+* * *
+
+## Part 2: Research question
+
+* Has American's views on suicide changed with the time?
+
+This question could be divided into 2 parts:
+
+1. Has the American's opinion on people should have the right to suicide in circumstance of having incurable disease changed during 30 years (1982 vs. 2012)? 
+
+2. Has the American's opinion on people should have the right to suicide in circumstance of feeling tired of living changed during 30 years (1982 vs. 2012)?
+
+This is an interesting question because people's attitudes toward suicide could reveal societal change. The views on suicide have been influenced by broad themes, for example, religion, the hope of life, and honor.  In this project, we consider two circumstances including having incurable disease and getting tired of life. Having incurable diseases could not be controlled by human will while getting tired of life is a subjective feeling. We could understand people's views on suicide comprehensively by combining these situations. We choose a time interval of 30 years, which is reasonable since it probably is enough to produce a new generation of people.
+
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+The following code choose subset which includes years 1972 and 2012 together with features ```suicide11``` and ```suicide14```. 
+
+```{r}
+# choose data subset
+suicide_dis <- gss %>% select(year, suicide1)%>% 
+  filter(year %in% c(1982, 2012)) %>% na.omit()
+
+suicide_liv <- gss %>% select(year, suicide4) %>% 
+  filter(year %in% c(1982, 2012)) %>% na.omit()
+
+# convert factor variables
+suicide_dis$suicide1 <- unfactor(suicide_dis$suicide1)
+suicide_liv$suicide4 <- unfactor(suicide_liv$suicide4)
+
+# convert year as character
+suicide_dis$year <- as.character(suicide_dis$year)
+suicide_liv$year <- as.character(suicide_liv$year)
+```
+
+### Question Part 1
+
+First a cross-tabulation need to be created in order to show thedistribution of variables ```year``` and ```suicide1```. 
+
+```{r}
+# create a cross-tabulation
+tabyl(suicide_dis, year, suicide1) %>% adorn_totals(c("row", "col"))
+```
+
+Since the total numbers are different, it is hard to directly observe the changes in people's attitudes. So we need to create a proportion table. 
+
+```{r}
+# create a summary table including proportions
+suicide_dis_table <- table(suicide_dis$year, suicide_dis$suicide1)
+
+prop.table(suicide_dis_table, 1)
+```
+
+This table shows that the proportion of people who agree humans should have the right to suicide when having incurable diseases increased about 16% from 1982 to 2012. We could visualize this in a bar plot. 
+
+```{r}
+ggplot(suicide_dis, aes(x=year, fill=suicide1))+
+  theme(text = element_text(size = 10)) +
+  labs(x = 'Year', y='Proportion') + 
+  coord_fixed(ratio=2) + 
+  scale_y_continuous(labels = c("0%", "25%", "50%", "75%", "100%")) + 
+  scale_fill_brewer(palette = "Set3") + 
+  ggtitle('Proportion of attitudes toward suicide if uncurable disease')+
+  geom_bar(position='fill', color='black')
+```
+
+The bar plot shows the difference of 16% in the proportion of people who agree on the right to suicide when facing incurable diseases. But we need more analysis such as hypothesis testing to decide whether this difference is statistically significant. 
+
+### Question Part 2
+
+A cross-tabulation is still need to be created in order to show the distribution of variables ```year``` and ```suicide4```. 
+
+```{r}
+# create a cross-tabulation
+tabyl(suicide_liv, year, suicide4) %>% adorn_totals(c("row", "col"))
+```
+
+A proportion table needs to be created to reveal the changes in people's attitudes more obviously. 
+
+```{r}
+# create a summary table including proportions
+suicide_liv_table <- table(suicide_liv$year, suicide_liv$suicide4)
+
+prop.table(suicide_liv_table, 1)
+```
+
+This table shows that the proportion of people who agree humans should have the right to suicide when getting tired of life increased about 6% from 1982 to 2012. We could visualize this in a bar plot. 
+
+```{r}
+ggplot(suicide_liv, aes(x=year, fill=suicide4))+
+  theme(text = element_text(size = 10)) +
+  labs(x = 'Year', y='Proportion') + 
+  coord_fixed(ratio=2) + 
+  scale_y_continuous(labels = c("0%", "25%", "50%", "75%", "100%")) + 
+  scale_fill_brewer(palette = "Set3") + 
+  ggtitle('Proportion of attitudes toward suicide if tired of living')+
+  geom_bar(position='fill', color='black')
+```
+
+The bar plot shows the difference of about 6% in the proportion of people who agree on the right of suicide when tired of living. But more analyses are still needed to decide whether this difference is statistically significant. 
+
+* * *
+
+## Part 4: Inference
+
+### Checking if the data meets the requirements
+
+The two parts of the question are mainly about inferential analysis for two categorical variables with two levels each. A two-sample z-test could be used to determine the statistical significance of differences in proportions. 
+
+The sample dataset must be independent, identically distributed variables and < 10% of the population. The number of successes and the number of failures should be at least 10 in each of the samples. Both two datasets fulfill the requirements and we could continue with subsequent analysis. 
+
+### Confidence Interval
+
+Since we are comparing two proportions, we could calculate a confidence interval for the parameter of the interest, which is proportion of people agree on suicide in certain circumstances. 
+
+Using a 95% confidence level to create the confidence interval for the difference in our two proportions. The point estimate is the difference between two ```yes``` proportions. 
+
+For part 1: 
+
+```{r}
+inference(y = suicide1,
+          x = year,
+          order = c(2012, 1982),
+          data=suicide_dis,
+          conf_level = 0.95,
+          statistic = "proportion",
+          type = "ci",
+          method = "theoretical",
+          success = "Yes",
+          show_eda_plot = FALSE)
+```
+
+For part 2:
+
+```{r}
+inference(y = suicide4,
+          x = year,
+          order = c(2012, 1982),
+          data=suicide_liv,
+          conf_level = 0.95,
+          statistic = "proportion",
+          type = "ci",
+          method = "theoretical",
+          success = "Yes",
+          show_eda_plot = FALSE)
+```
+
+* Conclusion:
+
+1. For part 1 of the question, we are 95% confident that in 2012, there was a 12.8% to 20% increase in the number of US adults who agree humans should have the right to suicide when having incurable diseases, compare with 1982. 
+
+2. For part 2 of the question, we are 95% confident that in 2012, there was a 3% to 8.4% increase in the number of US adults who agree humans should have the right to suicide when getting tired of living, compare with 1982. 
+
+### Hypothesis Test
+
+Sample dataset should be independent and < 10% of the population. Our datasets already fulfill the requirements. 
+
+When having a null hypothesis that two proportions are equal, pooled proportion should be calculated for checking the number of successes and failures. 
+
+```{r}
+# For suicide if incurable disease
+p_pool_yes = (754+742)/3025
+
+year1982 <- c(1768*p_pool_yes, 1768*(1-p_pool_yes))
+year2012 <- c(1257*p_pool_yes, 1257*(1-p_pool_yes))
+set1 <- data.frame(year1982, year2012, 
+                   row.names = c("success", "failure"))
+set1
+```
+
+The result fulfill the requirement of at least 10 failures and successes. 
+
+```{r}
+# For suicide if tired of living
+p_pool_yes = (239+240)/3046
+
+
+year1982 <- c(1790*p_pool_yes, 1790*(1-p_pool_yes))
+year2012 <- c(1256*p_pool_yes, 1256*(1-p_pool_yes))
+set2 <- data.frame(year1982, year2012, 
+                   row.names = c("success", "failure"))
+set2
+```
+
+The result fulfill the requirement of at least 10 failures and successes.
+
+We could set our null and alternative hypotheses.
+
+For both parts: 
+
+\[H_0: p_{{2012}_{yes}} - p_{{1982}_{yes}} = 0\]
+
+\[H_A: p_{{2012}_{yes}} - p_{{1982}_{yes}} ≠ 0\]
+
+```{r}
+#hypothesis test for part 1 with inference function
+inference(y = suicide1,
+          x = year,
+          order=c(2012,1982),
+          data=suicide_dis,
+          statistic = "proportion",
+          type = "ht",
+          method = "theoretical",
+          success = "Yes",
+          null=0,
+          alternative = 'twosided')
+```
+
+With such a small p, we could reject the null hypothesis and state that we have convincing evidence that between 1982 and 2012, there is a difference in the proportions of US adults who agree humans should have the right to suicide when having incurable diseases. 
+
+```{r}
+#hypothesis test for part 2 with inference function
+inference(y = suicide4,
+          x = year,
+          order=c(2012,1982),
+          data=suicide_liv,
+          statistic = "proportion",
+          type = "ht",
+          method = "theoretical",
+          success = "Yes",
+          null=0,
+          alternative = 'twosided')
+```
+
+With such a small p, we could reject the null hypothesis and state that we have convincing evidence that between 1982 and 2012, there is a difference in the proportions of US adults who agree humans should have the right to suicide when getting tired of living.
+
+### Conclusions
+
+From the result of the hypothesis tests, we have convincing evidence that there is a difference in the proportions of US adults who agree humans should have the right to suicide when having incurable diseases or getting tired of living between 1982 and 2012. 
+
+Combining with the result of Confidence Interval, we are 95% confident that in 2012, there was some range of increase in the number of US adults who agree humans should have right to suicide when having incurable diseases or getting tired of living, compared with 1982. 
+
+Has American's views on suicide changed with the time? Overall, the answer is yes and more Americans are considering suicide acceptable in different situations. 
+
+We can further confirm or supplement the result by including more factors, such as people’s attitudes towards suicide due to bankruptcy. To exclude the influence of special events in a certain year on the statistical data, we can also use data from more years.
+
+

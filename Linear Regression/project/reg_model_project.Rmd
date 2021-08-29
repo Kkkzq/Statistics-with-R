@@ -1,0 +1,171 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(dplyr)
+library(statsr)
+library(ggplot2)
+library(cowplot)
+library(RColorBrewer)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+* * *
+
+## Part 1: Data
+
+The dataset information is about movies contains 651 randomly sampled movies produced and released before 2016. This data set comes from Rotten Tomatoes and IMDB with total 32 available variables.
+
+### Generabizability
+
+The data is randomly sampled and it’s big enough (651 observations) so the generabizability principle is achieved. 
+
+### Causality
+
+The data is an observational and hence we can not conclude causality from it. We are only able to show association between variables in this dataset.
+
+* * *
+
+## Part 2: Research question
+
+What factors are associated with a movie's audience score?
+
+This is an interesting question. By answering this, we could predict a movie's audience score with certain information. Based on this, we will understand the factors that influence the audience evaluation of a movie. 
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, we choose ```audience_score``` as the response variable and we select all variables we needed. 
+
+```{r}
+# filter variables in movie dataset
+movies <- movies %>% select(audience_score, genre, runtime, mpaa_rating, thtr_rel_month, best_pic_nom, best_actor_win, best_actress_win, best_dir_win, top200_box, imdb_rating, critics_score,) %>% na.exclude()
+```
+
+We could create some plots to show the relations between average rating score and different factors. 
+
+```{r}
+pairs(~audience_score+thtr_rel_month+imdb_rating+critics_score+best_pic_nom+best_actor_win+best_actress_win+top200_box,
+      data=movies, 
+   main="Pair Assesment")
+```
+
+```{r}
+
+p1 <- ggplot(data = movies, aes(x = runtime, y = audience_score, color = runtime)) + geom_col() +
+  scale_color_distiller(palette = "Spectral")
+
+p2 <- ggplot(data = movies, aes(x = thtr_rel_month , y = audience_score, fill =thtr_rel_month)) + geom_col() + 
+  scale_color_distiller(palette = "Greens")
+
+plot_grid(p1, p2)
+
+
+movies %>% group_by(genre) %>% summarise(audience_score_by_genre = mean(audience_score)) %>% arrange(desc(audience_score_by_genre))
+
+movies %>% group_by(mpaa_rating) %>% summarise(audience_score_by_mpaa_rating = mean(audience_score)) %>% arrange(desc(audience_score_by_mpaa_rating))
+```
+
+From the figure we could see that those movies around 100 mins have better rating scores, while the difference between months is not as obvious as movie length. Movies released in 1, 6, 10 and 12 month have better rating scores.
+
+Documentary have highest average rating score and unrated movies have highest average rating score. 
+
+We then visualize the relation between Oscar rewards and audience scores. 
+
+```{r}
+par(mfrow = c(2,2))
+
+plot(movies$audience_score ~ movies$best_pic_nom , main = "best picture nomination")
+
+plot(movies$audience_score ~ movies$best_actor_win, main = "best actor win ")
+
+plot(movies$audience_score ~ movies$best_actress_win, main = "best actress win ")
+
+plot(movies$audience_score ~ movies$best_dir_win , main = "best director win ")
+
+```
+
+We could see that movies with best picture nomination or best director reward tend to have higher rating scores. Meanwhile, best actress or best actor rewards have weaker association with rating scores. 
+
+* * *
+
+## Part 4: Modeling
+
+We could build our first model. 
+
+```{r}
+l_m <- lm(data = movies, audience_score ~ genre + runtime + mpaa_rating + best_pic_nom + best_dir_win + thtr_rel_month + imdb_rating + critics_score + best_actor_win + best_actress_win + top200_box)
+summary(l_m) 
+```
+
+This model has an adjusted R-squared value of 0.7661. We could optimize this model. 
+
+```{r}
+final_model <- step(l_m , direction = "both" , trace = FALSE)
+summary(final_model)
+```
+
+We get a higher adjusted R-squared value of 0.7675 and 5 variables are excluded. This could be considered as the parsimony model. 
+
+The intercept value means that if all other variables are 0, the movie will have a prediction score of -32.76. If a movie has a best picture Oscar nomination while all other variables held constant, its score will increase 5.00. 
+
+We need to diagnose our model by checking residual plots. 
+
+```{r}
+# linearity
+p1 <- ggplot(data = final_model , aes(x = .fitted , y = .resid)) + geom_point() + geom_hline(yintercept = 0, linetype = "dashed") +
+  xlab("Fitted values") + ylab("Residuals")
+
+# normal
+p2 <- ggplot(data = final_model, aes(x = .resid)) + geom_histogram(binwidth = 15) + xlab("Residuals")
+
+p3 <- ggplot(data = final_model , aes(sample = .resid)) + stat_qq() + stat_qq_line() + 
+  xlab("theoretical") + ylab("sample")
+
+plot_grid(p1, p2, p3)
+
+```
+
+There is no fan shape in the residuals plot and the residuals are normally distributed in the histogram. Because the data is randomly sampled so the residuals are independent. The qqplot shows a nearly straight line so everything is good. 
+
+* * *
+
+## Part 5: Prediction
+
+We choose Zootopia in 2016. The true audience score for Zootopia in Rotten Tomatoes was 98 and our prediction value is 95.3, which is quite close to the real value. 
+
+```{r}
+predicted_movie <- data.frame(genre = "Comedy" , 
+                              runtime = 108, 
+                              best_pic_nom = "yes" ,
+                              thtr_rel_month = 2, 
+                              imdb_rating = 8.0, 
+                              critics_score = 98, 
+                              best_actress_win = "no")
+predict(final_model , predicted_movie , interval = "prediction" , level = 0.95 )
+```
+
+
+* * *
+
+## Part 6: Conclusion
+
+The research objetvice was to investigate what parameters have the major influences on the audience score of a movie. Using the model we build with 7 features, we could closely predict the audience score of a movie (Zootopia) which released in 2016. Including more numerical variables such as ticket selling amount might improve the accuracy of our model. 
+
