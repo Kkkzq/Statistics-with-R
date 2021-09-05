@@ -1,0 +1,279 @@
+# Bayesian Modeling and Prediction for Movies
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(BAS)
+library(tidyr)
+library(grid)
+library(GGally)
+library(gridExtra)
+library(MASS)
+library(cowplot)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded your data file will be called `movies`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+This is an observational study thus we can't infer causality based on this dataset. Random sampling are used so generazability is ensured. There might be bias in the dataset because the rating system might have bias and only US movies are included. 
+
+* * *
+
+## Part 2: Data manipulation
+
+```{r}
+# Looking at the summary table of the varibales in the dataset
+str(movies)
+```
+
+We need to remove the ```NA``` values. 
+
+```{r}
+dim(movies)
+movies <- na.omit(movies)
+dim(movies)
+```
+
+We need to create new variables and change the format of certain variables. 
+
+```{r}
+data_movies<-movies %>% mutate(feature_film = factor(ifelse(title_type=="Feature Film",c("yes"), c("no")),levels=c("no","yes"))) %>%
+mutate(drama = factor(ifelse(genre=="Drama", c("yes"), c("no")),levels=c("no","yes")))%>%
+mutate(mpaa_rating_R =factor(ifelse(mpaa_rating=="R", c("yes"), c("no")),levels=c("no","yes")))%>%
+mutate(oscar_season = factor(ifelse(thtr_rel_month%in% 10:12, c("yes"), c("no")),levels=c("no","yes")))%>%
+mutate(summer_season = factor(ifelse(thtr_rel_month %in% 5:8, c("yes"), c("no")),levels=c("no","yes")))
+```
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+In this part, we need to perform exploratory data analysis on variable ```audience_score``` and other potential associated variables. 
+
+We first visualize the variable ```audience_score```. 
+
+```{r}
+ggplot(data_movies, aes(x = audience_score, y = ..density..)) +
+  geom_histogram(bins = 40, fill = 'darkgrey', colour = 'darkgrey') + 
+  geom_density(size = 1, colour = 'yellow') 
+```
+
+We could see slightly left screwed structure in ```audience_score``` variable. Checking some statistical values:
+
+```{r}
+summary(data_movies$audience_score)
+```
+
+Now we draw boxplots for other potential associated variables in order to illustrate their variability. 
+
+```{r}
+p1 <- ggplot(data_movies, aes(y=audience_score, x=feature_film, fill = feature_film)) +
+  geom_boxplot() +
+  ggtitle("Audience Score & Feature Films") +
+  xlab("Feature Films") +
+  ylab("Audience Score") + 
+  scale_fill_brewer(name = "feature film")
+
+
+p2 <- ggplot(data_movies, aes(x = summer_season, y = audience_score, fill = summer_season)) + 
+  geom_boxplot() + 
+  ggtitle('Audience score & summer season') + 
+  xlab('summer season') + 
+  ylab('Audience Score') + scale_fill_brewer(name = "summer season")
+
+
+p3 <- ggplot(data_movies, aes(x = oscar_season, y = audience_score, fill = oscar_season)) + 
+  geom_boxplot() + 
+  ggtitle('Audience score & oscar_season') +
+  xlab('oscar_season') + 
+  ylab('Audience Score') + 
+  scale_fill_brewer(name = "oscar_season")
+
+
+p4 <- ggplot(data_movies, aes(x = drama, y = audience_score, fill = drama)) + 
+  geom_boxplot() +
+  ggtitle('Audience score & drama') + 
+  xlab('drama') + 
+  ylab('Audience Score') + 
+  scale_fill_brewer(name = "drama")
+
+
+p5 <- ggplot(data_movies, aes(x = mpaa_rating_R, y = audience_score, fill = mpaa_rating_R)) + 
+  geom_boxplot() + 
+  ggtitle('Audience score & mpaa_rating_R') +
+  xlab('mpaa_rating_R') + 
+  ylab('Audience Score') + 
+  scale_fill_brewer(name = "mpaa_rating_R")
+
+grid.arrange(p1, p2, p3, p4, p5, ncol = 2)
+```
+
+We could see that the ```audience_score``` shows smaller difference between options of ```mpaa_rating_R``` variable. But the audience scores are relatively higher in films that have no features and slightly higher in films no released in summer season. Films with Oscar season and belongs to drama category have higher audience scores. 
+
+We could show other variables with density plots. 
+
+```{r}
+p1 <- ggplot(data_movies, aes(audience_score, fill = top200_box))+ 
+  geom_density () + 
+  labs(title = "Audience score & top200_box") + 
+  labs(x = "top200 box", y = "Density") +
+  scale_fill_brewer(palette = "Set2")
+
+p2 <- ggplot(data_movies, aes(audience_score, fill = best_pic_nom))+ 
+  geom_density () + 
+  labs(title = "Audience score & best_pic_nom") + 
+  labs(x = "best pic nom", y = "Density") +
+  scale_fill_brewer(palette = "Set2")
+
+
+p3 <- ggplot(data_movies, aes(audience_score, fill = best_pic_win)) + 
+  geom_density() + 
+  labs(title = "Audience score & best pic win") + 
+  labs(x = "best pic win", y = "Density") + 
+  scale_fill_brewer(palette = "Set2")
+
+p4 <- ggplot(data_movies, aes(audience_score, fill = best_actor_win))+ 
+  geom_density () + 
+  labs(title = "Audience score & best_actor_win") + 
+  labs(x = "best actor win", y = "Density") + 
+  scale_fill_brewer(palette = "Set2")
+
+  
+p5 <- ggplot(data_movies, aes(audience_score, fill = best_dir_win))+ 
+  geom_density () + 
+  labs(title = "Audience score & best_dir_win") + 
+  labs(x = "best dir win", y = "Density") + 
+  scale_fill_brewer(palette = "Set2")
+
+    
+p6 <- ggplot(data_movies, aes(audience_score, fill = best_actress_win))+ 
+  geom_density () + 
+  labs(title = "Audience score & best_actress_win") + 
+  labs(x = "best actress win", y = "Density") + 
+  scale_fill_brewer(palette = "Set2")
+
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 2)
+```
+
+We could see that top200 movies and movies that won best picture award or have best picture nomination in Oscar have relatively higher audience scores. However, movies that won best director, actor or actress awards have slightly higher audience scores. 
+
+* * *
+
+## Part 4: Modeling
+
+We could use  ```bayes_inference``` function to construct credible intervals, perform hypothesis test and calculate Bayes factors. We'd like to investigate the influence of other variables to ```audience_score```. 
+
+```{r}
+bayes_inference(y = audience_score, x = feature_film, data = data_movies, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+
+bayes_inference(y = audience_score, x = drama, data = data_movies, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+
+bayes_inference(y = audience_score, x = oscar_season, data = data_movies, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+
+bayes_inference(y = audience_score, x = summer_season, data = data_movies, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+
+bayes_inference(y = audience_score, x = mpaa_rating_R, data = data_movies, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+Checking the value of Bayes factors. 
+
+* For ```feature_film```, evidence against H1 is very strong. 
+
+* For ```drama```, the evidence against H1 is positive. 
+
+* For ```oscar_season```, the evidence against H2 is positive. 
+
+* For ```summmer_season```, the evidence against H2 is positive.
+
+* For ```mpaa_rating```, the evidence against H2 is positive. 
+
+We could find significant difference of audience scores in feature and non-feature films. 
+
+* * *
+
+## Part 5: Prediction
+
+In this part we first filter siginificant variables. 
+
+```{r}
+data.model <- data_movies[c("feature_film","drama","runtime","mpaa_rating_R","thtr_rel_year","oscar_season","summer_season","imdb_rating","imdb_num_votes","critics_score","best_pic_nom","best_pic_win","best_actor_win","best_actress_win","best_dir_win","top200_box","audience_score")]
+
+str(data.model)
+
+lm_model <- lm(audience_score ~ ., data = data.model)
+score_step <- stepAIC(lm_model, trace = FALSE)
+score_step$anova
+```
+
+Our final model includes ```runtime + mpaa_rating_R + thtr_rel_year + imdb_rating + critics_score + best_pic_nom + best_actor_win + best_actress_win```. Next we perform Bayesian Model Average. 
+
+```{r}
+BMA_audience_score <- bas.lm(audience_score ~., data = data.model, prior = "BIC", modelprior = uniform())
+summary(BMA_audience_score)
+image(BMA_audience_score, rotate = FALSE)
+```
+
+The figure illustrates ```runtime```, ```imdb_rating``` and ```critic_score``` have higher posterior odds. 
+
+```{r}
+coef_BMA_audience_score <- coef(BMA_audience_score)
+plot(coef_BMA_audience_score)
+```
+
+
+We will kept the three variables we mentioned before in the final model. 
+
+```{r}
+finalmodel <- data.model[c("runtime","imdb_rating","critics_score","audience_score")]
+
+BMA_finalmodel <- bas.lm(audience_score ~., data = finalmodel, prior = "ZS-null", method = "MCMC", modelprior = uniform())
+
+summary(BMA_finalmodel)
+```
+
+* * *
+
+## Part 6: Conclusion
+
+We choose a famous film "La La Land (2016)" and predict its audience score. 
+
+```{r}
+lalaland <- data.frame(feature_film="yes",drama="yes",runtime=128,mpaa_rating_R="no",thtr_rel_year=2016,oscar_season="yes",summer_season="no",imdb_rating=8.1,imdb_num_votes=310814,critics_score=93,best_pic_nom="yes",best_pic_win="yes",best_actor_win="yes",best_actress_win="yes",best_dir_win="yes",top200_box="yes",audience_score=81)
+
+data.predict <- rbind(data.model, lalaland)
+lalaland <- tail(lalaland, 1)
+str(lalaland)
+```
+
+We predict the audience score. 
+
+```{r}
+audience_score_prediction <-predict(BMA_finalmodel, newdata=lalaland, estimator="BMA", se.fit=TRUE, interval="predict", level = 0.95)
+
+audience_score_prediction$fit
+```
+
+We get a slightly higher audience score of 87.7 compared with real score of 81. 
+
+## Conclusion
+
+During the project we successfuly build a prediction model for ```audience_score``` with filtered variables. Using this model to predict other movies and we have a good result. There are some difference between real score value and our prediction value, that might because we need collect more data which could describe movies throughly and include new variables in our model.  
+
